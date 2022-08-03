@@ -1,0 +1,137 @@
+import { useEffect, useState } from 'react'
+import BigNumber from 'bignumber.js'
+import { useWeb3React } from '@web3-react/core'
+import { getBep20Contract, getNewCowrieTokenContract, getPresaleTokenContract } from 'utility/contractHelpers'
+import { BIG_ZERO } from 'utility/bigNumber'
+import useWeb3 from './useWeb3'
+import useRefresh from './useRefresh'
+import useLastUpdated from './useLastUpdated'
+
+export const FetchStatus = {
+  NOT_FETCHED : 'not-fetched',
+  SUCCESS : 'success',
+  FAILED : 'failed',
+}
+
+const useTokenBalance = (tokenAddress) => {
+  const { NOT_FETCHED, SUCCESS, FAILED } = FetchStatus
+  const [balanceState, setBalanceState] = useState({
+    balance: BIG_ZERO,
+    fetchStatus: NOT_FETCHED,
+  })
+  const web3 = useWeb3()
+  const { account } = useWeb3React()
+  const { fastRefresh } = useRefresh()
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      const contract = getBep20Contract(tokenAddress, web3)
+      try {
+        const res = await contract.methods.balanceOf(account).call()
+        setBalanceState({ balance: new BigNumber(res), fetchStatus: SUCCESS })
+      } catch (e) {
+        console.error(e)
+        setBalanceState((prev) => ({
+          ...prev,
+          fetchStatus: FAILED,
+        }))
+      }
+    }
+
+    if (account) {
+      fetchBalance()
+    }
+  }, [account, tokenAddress, web3, fastRefresh, SUCCESS, FAILED])
+
+  return balanceState
+}
+
+export const useTotalSupply = (chainId) => {
+  const { slowRefresh } = useRefresh()
+  const [totalSupply, setTotalSupply] = useState()
+  const web3 = useWeb3(chainId);
+  useEffect(() => {
+    async function fetchTotalSupply() {
+      const newcowrieContract = getNewCowrieTokenContract(chainId, web3)
+      const supply = await newcowrieContract.methods.totalSupply().call()
+      setTotalSupply(new BigNumber(supply))
+    }
+
+    fetchTotalSupply()
+  }, [slowRefresh,web3,chainId])
+
+  return totalSupply
+}
+
+export const useBurnedBalance = (tokenAddress) => {
+  const [balance, setBalance] = useState(BIG_ZERO)
+  const { slowRefresh } = useRefresh()
+  const web3 = useWeb3()
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      const contract = getBep20Contract(tokenAddress, web3)
+      const res = await contract.methods.balanceOf('0x000000000000000000000000000000000000dEaD').call()
+      setBalance(new BigNumber(res))
+    }
+
+    fetchBalance()
+  }, [web3, tokenAddress, slowRefresh])
+
+  return balance
+}
+
+export const useGetBnbBalance = (chainId) => {
+  const [balance, setBalance] = useState(BIG_ZERO)
+  const { account } = useWeb3React()
+  const { lastUpdated, setLastUpdated } = useLastUpdated()
+  const web3 = useWeb3(chainId)
+  
+  useEffect(() => {
+    const fetchBalance = async () => {
+      const walletBalance = await web3.eth.getBalance(account)
+      //console.log(account, web3,walletBalance,"library bal")
+      setBalance(new BigNumber(walletBalance))
+    }
+
+    if (account) {
+      fetchBalance()
+    }
+  }, [account, web3, lastUpdated])
+  
+  return { balance, refresh: setLastUpdated }
+}
+
+export const usePrsTokenBalance = (chainId) => {
+  const { NOT_FETCHED, SUCCESS, FAILED } = FetchStatus
+  const [balanceState, setBalanceState] = useState({
+    balance: BIG_ZERO,
+    fetchStatus: NOT_FETCHED,
+  })
+  const web3 = useWeb3(chainId)
+  const { account } = useWeb3React()
+  const { fastRefresh } = useRefresh()
+
+  useEffect(() => {
+    const fetchBalance = async () => {
+      const contract = getPresaleTokenContract(chainId, web3)
+      try {
+        const res = await contract.methods.balanceOf(account).call()
+        setBalanceState({ balance: new BigNumber(res), fetchStatus: SUCCESS })
+      } catch (e) {
+        console.error(e)
+        setBalanceState((prev) => ({
+          ...prev,
+          fetchStatus: FAILED,
+        }))
+      }
+    }
+
+    if (account) {
+      fetchBalance()
+    }
+  }, [account, chainId, web3, fastRefresh, SUCCESS, FAILED])
+
+  return balanceState
+}
+export default useTokenBalance
